@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Weight &amp; GLP-1 Tracker</title>
+<meta name="theme-color" content="#0a0a0a" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="GLP-1 Log" />
+<meta name="mobile-web-app-capable" content="yes" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<link rel="icon" href="icon-192.png" />
+<link rel="manifest" href="manifest.json" />
+<style>
+  :root{
+    --bg:#0a0a0a; --card:#171717; --border:#262626; --border-light:#3f3f46;
+    --text:#f5f5f5; --dim:#a3a3a3; --faint:#737373; --faint2:#525252;
+    --teal:#2dd4bf; --teal-btn:#0d9488; --teal-btn-active:#0f766e;
+    --amber:#fbbf24; --amber-btn:#d97706; --amber-btn-active:#b45309;
+    --red:#ef4444;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+  .app{max-width:448px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;}
+  header{padding:20px 16px 12px;border-bottom:1px solid var(--border);text-align:center;}
+  header .eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:500;}
+  header h1{font-size:20px;font-weight:600;margin:0;margin-top:-2px;}
+  .install-banner{background:var(--teal-btn);color:white;padding:10px 16px;display:flex;align-items:center;
+    justify-content:space-between;gap:12px;font-size:13px;}
+  .install-banner-actions{display:flex;align-items:center;gap:4px;flex-shrink:0;}
+  .install-banner button#install-btn{background:white;color:var(--teal-btn-active);border:none;border-radius:6px;
+    padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer;}
+  .install-banner button#install-dismiss{background:none;border:none;color:white;padding:4px;cursor:pointer;display:flex;}
+  main{flex:1;padding:16px;padding-bottom:96px;display:flex;flex-direction:column;gap:16px;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;
+    box-shadow:0 1px 8px rgba(0,0,0,.3);}
+  .section-title{font-size:12px;text-transform:uppercase;letter-spacing:.04em;font-weight:600;margin-bottom:12px;
+    display:flex;align-items:center;gap:6px;}
+  .section-title.teal{color:var(--teal);}
+  .section-title.amber{color:var(--amber);}
+  .section-title.dim{color:var(--dim);}
+  .row-between{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  .link-btn{background:none;border:none;color:var(--faint);font-size:12px;display:flex;align-items:center;gap:4px;
+    cursor:pointer;padding:0;}
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px 16px;}
+  .stat-label{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint2);font-weight:500;}
+  .stat-value{font-size:20px;font-weight:600;line-height:1.2;margin-top:2px;}
+  .stat-sub{font-size:11px;color:var(--faint);margin-top:2px;}
+  .muted{color:var(--faint);font-size:14px;padding:8px 0;}
+  .empty-chart{color:var(--faint);font-size:14px;text-align:center;padding:24px 0;}
+  .field{font-size:12px;color:var(--dim);display:block;}
+  .field.full{grid-column:span 2;}
+  .field input,.field select{width:100%;margin-top:4px;background:var(--card);color:var(--text);
+    border:1px solid var(--border-light);border-radius:8px;padding:9px 8px;font-size:14px;
+    font-family:inherit;color-scheme:dark;}
+  .field input::placeholder{color:var(--faint2);}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .btn{width:100%;border:none;border-radius:8px;padding:11px;font-size:14px;font-weight:500;color:white;
+    display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;margin-top:12px;}
+  .btn-teal{background:var(--teal-btn);}
+  .btn-teal:active{background:var(--teal-btn-active);}
+  .btn-amber{background:var(--amber-btn);}
+  .btn-amber:active{background:var(--amber-btn-active);}
+  .history-list{list-style:none;margin:0;padding:0;}
+  .history-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;
+    border-top:1px solid var(--border);}
+  .history-row:first-child{border-top:none;}
+  .history-row.editing{opacity:.55;}
+  .history-main .line1{font-size:14px;}
+  .history-main .line2{font-size:12px;color:var(--faint);margin-top:1px;}
+  .history-actions{display:flex;align-items:center;gap:2px;}
+  .icon-btn{background:none;border:none;color:var(--faint2);padding:6px;cursor:pointer;display:flex;}
+  .icon-btn.edit:active{color:var(--teal);}
+  .icon-btn.edit-amber:active{color:var(--amber);}
+  .icon-btn.del:active{color:var(--red);}
+  nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--border);
+    display:flex;max-width:448px;margin:0 auto;width:100%;}
+  nav button{flex:1;background:none;border:none;color:var(--faint);display:flex;flex-direction:column;
+    align-items:center;gap:2px;padding:10px 0;font-size:11px;font-weight:500;cursor:pointer;
+    font-family:inherit;}
+  nav button.active{color:var(--teal);}
+  svg.icon{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+(function(){
+
+  // ---------- icons ----------
+  const ICONS = {
+    home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>',
+    scale: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
+    syringe: '<path d="M18.5 2.5l3 3M16 5l-1.5-1.5M9 9L3 15l-1 4 4-1 6-6M12 6l6 6M10 8l6 6"/>',
+    pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+    trash: '<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14Z"/>',
+    plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
+    x: '<path d="M18 6 6 18"/><path d="M6 6l12 12"/>',
+  };
+  function icon(name){ return '<svg class="icon" viewBox="0 0 24 24">'+ICONS[name]+'</svg>'; }
+
+  // ---------- constants ----------
+  const SITES = [
+    { id: "leftArmBack", label: "Left arm (back)" },
+    { id: "rightArmBack", label: "Right arm (back)" },
+    { id: "stomachUL", label: "Stomach — upper left" },
+    { id: "stomachUR", label: "Stomach — upper right" },
+    { id: "stomachLL", label: "Stomach — lower left" },
+    { id: "stomachLR", label: "Stomach — lower right" },
+    { id: "leftThigh", label: "Left thigh (upper)" },
+    { id: "rightThigh", label: "Right thigh (upper)" },
+  ];
+  const siteLabel = (id) => (SITES.find(s => s.id === id) || {}).label || id;
+
+  const todayStr = () => new Date().toISOString().slice(0, 10);
+  const nowTimeStr = () => new Date().toTimeString().slice(0, 5);
+  const dtKey = (d, t) => d + "T" + (t || "00:00");
+
+  const fmtDateShort = (d) => new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const fmtTime12 = (t) => {
+    if (!t) return "";
+    const [h, m] = t.split(":").map(Number);
+    const ampm = h >= 12 ? "PM" : "AM";
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    return h12 + ":" + String(m).padStart(2, "0") + " " + ampm;
+  };
+  function esc(str){ return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  // ---------- storage (localStorage, this device/browser only) ----------
+  const loadList = (key) => { try { return JSON.parse(localStorage.getItem(key) || "[]"); } catch { return []; } };
+  const saveList = (key, list) => { try { localStorage.setItem(key, JSON.stringify(list)); } catch(e) { console.error("save failed", e); } };
+
+  // ---------- state ----------
+  const state = {
+    tab: "home",
+    weightEntries: loadList("glp1-weight-log"),
+    injections: loadList("glp1-injection-log"),
+    editingWeightId: null,
+    editingInjectionId: null,
+    weightDraft: { date: todayStr(), time: nowTimeStr(), weight: "" },
+    injectionDraft: { date: todayStr(), time: nowTimeStr(), site: "", units: "" },
+  };
+
+  let deferredInstallPrompt = null;
+  let installDismissed = false;
+
+  function sortByDT(list){
+    return [...list].sort((a,b) => dtKey(a.date,a.time) < dtKey(b.date,b.time) ? 1 : -1); // desc, newest first
+  }
+  function sortByDTAsc(list){
+    return [...list].sort((a,b) => dtKey(a.date,a.time) > dtKey(b.date,b.time) ? 1 : -1);
+  }
+
+  // ---------- chart ----------
+  function lineChartSVG(points, stroke, unit){
+    const w = 600, h = 220, padL = 42, padR = 12, padT = 12, padB = 26;
+    const plotW = w - padL - padR, plotH = h - padT - padB;
+    const values = points.map(p => p.value);
+    let min = Math.min(...values), max = Math.max(...values);
+    if (min === max) { min -= 1; max += 1; }
+    const pad = (max - min) * 0.12;
+    min -= pad; max += pad;
+    const xFor = (i) => points.length > 1 ? padL + (plotW / (points.length - 1)) * i : padL + plotW/2;
+    const yFor = (v) => padT + plotH - ((v - min) / (max - min)) * plotH;
+
+    let grid = "";
+    for (let g = 0; g <= 4; g++){
+      const y = padT + (plotH/4)*g;
+      grid += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${w-padR}" y2="${y.toFixed(1)}" stroke="#3f3f46" stroke-dasharray="3 3" stroke-width="1"/>`;
+    }
+    const linePts = points.map((p,i) => xFor(i).toFixed(1)+","+yFor(p.value).toFixed(1)).join(" ");
+    const labelStep = Math.max(1, Math.ceil(points.length/6));
+    let dots = "", labels = "";
+    points.forEach((p,i) => {
+      const x = xFor(i).toFixed(1), y = yFor(p.value).toFixed(1);
+      dots += `<circle cx="${x}" cy="${y}" r="3.5" fill="${stroke}"><title>${esc(p.label)}: ${p.value}${unit}</title></circle>`;
+      if (i % labelStep === 0 || i === points.length-1){
+        labels += `<text x="${x}" y="${h-8}" font-size="10.5" fill="#a1a1aa" text-anchor="middle">${esc(p.label)}</text>`;
+      }
+    });
+    return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block">
+      ${grid}
+      <polyline points="${linePts}" fill="none" stroke="${stroke}" stroke-width="2.5"/>
+      ${dots}${labels}
+    </svg>`;
+  }
+
+  // ---------- render: home ----------
+  function renderHome(){
+    const sortedW = sortByDTAsc(state.weightEntries);
+    const sortedI = sortByDTAsc(state.injections);
+    const hasData = sortedW.length > 0;
+    const first = sortedW[0], last = sortedW[sortedW.length-1];
+    const loss = hasData ? first.weight - last.weight : 0;
+
+    let statsHTML;
+    if (hasData){
+      const start = new Date(first.date+"T00:00:00");
+      const days = Math.max(0, Math.floor((new Date() - start) / 86400000));
+      const weeks = (days/7).toFixed(1), months = (days/30.44).toFixed(1);
+      const lossColor = loss > 0 ? "var(--teal)" : loss < 0 ? "var(--amber)" : "var(--text)";
+      const lossSign = loss > 0 ? "-" : loss < 0 ? "+" : "";
+      statsHTML = `
+        <div class="stat-grid">
+          <div><div class="stat-label">Starting</div><div class="stat-value">${first.weight} lb</div><div class="stat-sub">${fmtDateShort(first.date)}</div></div>
+          <div><div class="stat-label">Current</div><div class="stat-value">${last.weight} lb</div><div class="stat-sub">${fmtDateShort(last.date)}</div></div>
+          <div><div class="stat-label">Total change</div><div class="stat-value" style="color:${lossColor}">${lossSign}${Math.abs(loss).toFixed(1)} lb</div></div>
+          <div><div class="stat-label">Time tracked</div><div class="stat-value">${days} ${days===1?"day":"days"}</div><div class="stat-sub">${weeks} wks / ${months} mo</div></div>
+        </div>`;
+    } else {
+      statsHTML = `<div class="muted">Log your first weigh-in to see your stats here.</div>`;
+    }
+
+    const weightChart = sortedW.length >= 2
+      ? lineChartSVG(sortedW.map(w => ({label: fmtDateShort(w.date), value: w.weight})), "#2dd4bf", " lb")
+      : `<div class="empty-chart">Add at least two weigh-ins to see a trend line.</div>`;
+
+    const injChart = sortedI.length >= 2
+      ? lineChartSVG(sortedI.map(i => ({label: fmtDateShort(i.date), value: i.units})), "#fbbf24", " units")
+      : `<div class="empty-chart">Add at least two injections to see a trend line.</div>`;
+
+    return `
+      <div class="card">
+        <div class="section-title teal">Progress</div>
+        ${statsHTML}
+      </div>
+      <div class="card">
+        <div class="section-title teal">${icon('scale')} Weight trend</div>
+        ${weightChart}
+      </div>
+      <div class="card">
+        <div class="section-title amber">${icon('syringe')} Injection doses</div>
+        ${injChart}
+      </div>`;
+  }
+
+  // ---------- render: weight tab ----------
+  function renderWeightTab(){
+    const d = state.weightDraft;
+    const sorted = sortByDT(state.weightEntries);
+    const editing = !!state.editingWeightId;
+
+    const rows = sorted.length === 0
+      ? `<div class="muted">No entries yet.</div>`
+      : `<ul class="history-list">${sorted.map(e => `
+          <li class="history-row ${state.editingWeightId===e.id?'editing':''}">
+            <div class="history-main">
+              <div class="line1 mono">${e.weight} lb</div>
+              <div class="line2">${fmtDateShort(e.date)} · ${fmtTime12(e.time)}</div>
+            </div>
+            <div class="history-actions">
+              <button class="icon-btn edit" data-w-edit="${e.id}" aria-label="Edit entry">${icon('pencil')}</button>
+              <button class="icon-btn del" data-w-del="${e.id}" aria-label="Delete entry">${icon('trash')}</button>
+            </div>
+          </li>`).join("")}</ul>`;
+
+    return `
+      <div class="card">
+        <div class="row-between">
+          <div class="section-title teal" style="margin-bottom:0">${editing?"Edit weigh-in":"Log a weigh-in"}</div>
+          ${editing ? `<button class="link-btn" id="w-cancel">${icon('x')} Cancel</button>` : ""}
+        </div>
+        <div class="grid2">
+          <label class="field">Date<input type="date" id="w-date" value="${d.date}"></label>
+          <label class="field">Time<input type="time" id="w-time" value="${d.time}"></label>
+          <label class="field full">Weight (lb)<input type="number" step="0.1" inputmode="decimal" id="w-weight" placeholder="e.g. 214.6" class="mono" value="${esc(d.weight)}"></label>
+        </div>
+        <button class="btn btn-teal" id="w-save">${editing? icon('pencil')+" Save changes" : icon('plus')+" Add weigh-in"}</button>
+      </div>
+      <div class="card">
+        <div class="section-title dim">History</div>
+        ${rows}
+      </div>`;
+  }
+
+  // ---------- render: injection tab ----------
+  function renderInjectionTab(){
+    const d = state.injectionDraft;
+    const sorted = sortByDT(state.injections);
+    const editing = !!state.editingInjectionId;
+
+    const options = `<option value="" disabled ${d.site?"":"selected"}>Select a site…</option>` +
+      SITES.map(s => `<option value="${s.id}" ${d.site===s.id?"selected":""}>${esc(s.label)}</option>`).join("");
+
+    const rows = sorted.length === 0
+      ? `<div class="muted">No entries yet.</div>`
+      : `<ul class="history-list">${sorted.map(e => `
+          <li class="history-row ${state.editingInjectionId===e.id?'editing':''}">
+            <div class="history-main">
+              <div class="line1 mono">${e.units} units — ${esc(siteLabel(e.site))}</div>
+              <div class="line2">${fmtDateShort(e.date)} · ${fmtTime12(e.time)}</div>
+            </div>
+            <div class="history-actions">
+              <button class="icon-btn edit-amber" data-i-edit="${e.id}" aria-label="Edit entry">${icon('pencil')}</button>
+              <button class="icon-btn del" data-i-del="${e.id}" aria-label="Delete entry">${icon('trash')}</button>
+            </div>
+          </li>`).join("")}</ul>`;
+
+    return `
+      <div class="card">
+        <div class="row-between">
+          <div class="section-title amber" style="margin-bottom:0">${editing?"Edit injection":"Log an injection"}</div>
+          ${editing ? `<button class="link-btn" id="i-cancel">${icon('x')} Cancel</button>` : ""}
+        </div>
+        <div class="grid2" style="margin-bottom:12px">
+          <label class="field">Date<input type="date" id="i-date" value="${d.date}"></label>
+          <label class="field">Time<input type="time" id="i-time" value="${d.time}"></label>
+        </div>
+        <label class="field">Injection site<select id="i-site">${options}</select></label>
+        <label class="field" style="margin-top:12px">Amount (units)<input type="number" step="0.25" inputmode="decimal" id="i-units" placeholder="e.g. 10" class="mono" value="${esc(d.units)}"></label>
+        <button class="btn btn-amber" id="i-save">${editing? icon('pencil')+" Save changes" : icon('plus')+" Add injection"}</button>
+      </div>
+      <div class="card">
+        <div class="section-title dim">History</div>
+        ${rows}
+      </div>`;
+  }
+
+  // ---------- shell + handlers ----------
+  function render(){
+    const body = state.tab === "home" ? renderHome() : state.tab === "weight" ? renderWeightTab() : renderInjectionTab();
+    const showInstallBanner = deferredInstallPrompt && !installDismissed;
+    document.getElementById("app").innerHTML = `
+      <div class="app">
+        <header><div class="eyebrow">Logbook</div><h1>Weight &amp; GLP-1 Tracker</h1></header>
+        ${showInstallBanner ? `
+          <div class="install-banner">
+            <span>Install this app on your device</span>
+            <div class="install-banner-actions">
+              <button id="install-btn">Install</button>
+              <button id="install-dismiss" aria-label="Dismiss">${icon('x')}</button>
+            </div>
+          </div>` : ""}
+        <main>${body}</main>
+        <nav>
+          <button data-tab="home" class="${state.tab==='home'?'active':''}">${icon('home')}Home</button>
+          <button data-tab="weight" class="${state.tab==='weight'?'active':''}">${icon('scale')}Weight</button>
+          <button data-tab="injection" class="${state.tab==='injection'?'active':''}">${icon('syringe')}Shot</button>
+        </nav>
+      </div>`;
+    attachHandlers();
+  }
+
+  function attachHandlers(){
+    const installBtn = document.getElementById("install-btn");
+    if (installBtn) installBtn.addEventListener("click", async () => {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      try { await deferredInstallPrompt.userChoice; } catch (e) {}
+      deferredInstallPrompt = null;
+      render();
+    });
+    const dismissBtn = document.getElementById("install-dismiss");
+    if (dismissBtn) dismissBtn.addEventListener("click", () => { installDismissed = true; render(); });
+
+    document.querySelectorAll("[data-tab]").forEach(btn => {
+      btn.addEventListener("click", () => { state.tab = btn.dataset.tab; render(); });
+    });
+
+    if (state.tab === "weight"){
+      document.getElementById("w-save").addEventListener("click", () => {
+        const date = document.getElementById("w-date").value || todayStr();
+        const time = document.getElementById("w-time").value || nowTimeStr();
+        const weight = parseFloat(document.getElementById("w-weight").value);
+        if (isNaN(weight)) return;
+        if (state.editingWeightId){
+          state.weightEntries = state.weightEntries.map(e => e.id === state.editingWeightId ? {...e, date, time, weight} : e);
+        } else {
+          state.weightEntries.push({ id: Date.now().toString(), date, time, weight });
+        }
+        saveList("glp1-weight-log", state.weightEntries);
+        state.editingWeightId = null;
+        state.weightDraft = { date: todayStr(), time: nowTimeStr(), weight: "" };
+        render();
+      });
+      const cancelBtn = document.getElementById("w-cancel");
+      if (cancelBtn) cancelBtn.addEventListener("click", () => {
+        state.editingWeightId = null;
+        state.weightDraft = { date: todayStr(), time: nowTimeStr(), weight: "" };
+        render();
+      });
+      document.querySelectorAll("[data-w-edit]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const e = state.weightEntries.find(x => x.id === btn.dataset.wEdit);
+          if (!e) return;
+          state.editingWeightId = e.id;
+          state.weightDraft = { date: e.date, time: e.time, weight: String(e.weight) };
+          render();
+        });
+      });
+      document.querySelectorAll("[data-w-del]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const id = btn.dataset.wDel;
+          state.weightEntries = state.weightEntries.filter(e => e.id !== id);
+          saveList("glp1-weight-log", state.weightEntries);
+          if (state.editingWeightId === id){
+            state.editingWeightId = null;
+            state.weightDraft = { date: todayStr(), time: nowTimeStr(), weight: "" };
+          }
+          render();
+        });
+      });
+    }
+
+    if (state.tab === "injection"){
+      document.getElementById("i-save").addEventListener("click", () => {
+        const date = document.getElementById("i-date").value || todayStr();
+        const time = document.getElementById("i-time").value || nowTimeStr();
+        const site = document.getElementById("i-site").value;
+        const units = parseFloat(document.getElementById("i-units").value);
+        if (isNaN(units) || !site) return;
+        if (state.editingInjectionId){
+          state.injections = state.injections.map(e => e.id === state.editingInjectionId ? {...e, date, time, site, units} : e);
+        } else {
+          state.injections.push({ id: Date.now().toString(), date, time, site, units });
+        }
+        saveList("glp1-injection-log", state.injections);
+        state.editingInjectionId = null;
+        state.injectionDraft = { date: todayStr(), time: nowTimeStr(), site: "", units: "" };
+        render();
+      });
+      const cancelBtn = document.getElementById("i-cancel");
+      if (cancelBtn) cancelBtn.addEventListener("click", () => {
+        state.editingInjectionId = null;
+        state.injectionDraft = { date: todayStr(), time: nowTimeStr(), site: "", units: "" };
+        render();
+      });
+      document.querySelectorAll("[data-i-edit]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const e = state.injections.find(x => x.id === btn.dataset.iEdit);
+          if (!e) return;
+          state.editingInjectionId = e.id;
+          state.injectionDraft = { date: e.date, time: e.time, site: e.site, units: String(e.units) };
+          render();
+        });
+      });
+      document.querySelectorAll("[data-i-del]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const id = btn.dataset.iDel;
+          state.injections = state.injections.filter(e => e.id !== id);
+          saveList("glp1-injection-log", state.injections);
+          if (state.editingInjectionId === id){
+            state.editingInjectionId = null;
+            state.injectionDraft = { date: todayStr(), time: nowTimeStr(), site: "", units: "" };
+          }
+          render();
+        });
+      });
+    }
+  }
+
+  // Service worker required for Chrome Android to treat this as installable
+  // (desktop doesn't require one, Android does). Now network-first, so it
+  // won't get stuck serving stale content like the original version did.
+  try {
+    if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")){
+      navigator.serviceWorker.register("sw.js").catch((e) => console.warn("SW registration failed:", e));
+    }
+  } catch (e) { console.warn("PWA setup skipped:", e); }
+
+  window.addEventListener("beforeinstallprompt", (e) => {
+    console.log("[install] beforeinstallprompt fired — Chrome says this IS installable.");
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    installDismissed = false;
+    render();
+  });
+  window.addEventListener("appinstalled", () => {
+    console.log("[install] appinstalled fired — install completed.");
+    deferredInstallPrompt = null;
+    render();
+  });
+  console.log("[install] Page loaded. Waiting for beforeinstallprompt (may take a few seconds, or may never fire if Chrome doesn't consider this installable).");
+
+  render();
+})();
+</script>
+</body>
+</html>
