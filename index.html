@@ -59,6 +59,14 @@
     font-family:inherit;color-scheme:dark;}
   .field input::placeholder{color:var(--faint2);}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .onboard-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);display:flex;align-items:center;
+    justify-content:center;padding:20px;z-index:100;}
+  .onboard-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;
+    max-width:360px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.5);}
+  .onboard-card h2{font-size:16px;margin:0 0 8px;}
+  .onboard-card p{font-size:13px;color:var(--dim);line-height:1.5;margin:0 0 16px;}
+  .onboard-card .btn{margin-bottom:8px;}
+  .onboard-card .btn:last-child{margin-bottom:0;}
   .btn{width:100%;border:none;border-radius:8px;padding:11px;font-size:14px;font-weight:500;color:white;
     display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;margin-top:12px;}
   .btn-teal{background:var(--teal-btn);}
@@ -133,7 +141,11 @@
 
   // ---------- storage (localStorage, this device/browser only) ----------
   const loadList = (key) => { try { return JSON.parse(localStorage.getItem(key) || "[]"); } catch { return []; } };
-  const saveList = (key, list) => { try { localStorage.setItem(key, JSON.stringify(list)); } catch(e) { console.error("save failed", e); } queueSync(); };
+  const saveList = (key, list) => {
+    try { localStorage.setItem(key, JSON.stringify(list)); } catch(e) { console.error("save failed", e); }
+    if (list.length > 0) localStorage.setItem("glp1-onboarded", "1");
+    queueSync();
+  };
 
   // ---------- server backup (dellcasa, tailnet-only) ----------
   const BACKUP_URL = "https://dellcasa-1.tail2b3657.ts.net:8096";
@@ -171,8 +183,8 @@
     render();
   }
 
-  async function restoreFromServer(){
-    if (!confirm("This overwrites the weight and injection logs on THIS device with the latest server backup. Continue?")) return;
+  async function restoreFromServer(skipConfirm){
+    if (!skipConfirm && !confirm("This overwrites the weight and injection logs on THIS device with the latest server backup. Continue?")) return;
     try {
       const res = await fetch(BACKUP_URL + "/backup", { headers: { "X-Api-Key": BACKUP_API_KEY } });
       if (!res.ok) throw new Error("bad status " + res.status);
@@ -181,12 +193,20 @@
       state.injections = data.injections || [];
       localStorage.setItem("glp1-weight-log", JSON.stringify(state.weightEntries));
       localStorage.setItem("glp1-injection-log", JSON.stringify(state.injections));
+      localStorage.setItem("glp1-onboarded", "1");
+      state.needsOnboardCheck = false;
       alert("Restored from backup.");
       render();
     } catch (e) {
       console.error("restore failed", e);
       alert("Restore failed. Make sure this device is connected to Tailscale.");
     }
+  }
+
+  function dismissOnboardCheck(){
+    localStorage.setItem("glp1-onboarded", "1");
+    state.needsOnboardCheck = false;
+    render();
   }
 
   // ---------- state ----------
@@ -199,6 +219,8 @@
     weightDraft: { date: todayStr(), time: nowTimeStr(), weight: "" },
     injectionDraft: { date: todayStr(), time: nowTimeStr(), site: "", units: "" },
   };
+  state.needsOnboardCheck = !localStorage.getItem("glp1-onboarded")
+    && state.weightEntries.length === 0 && state.injections.length === 0;
 
   let deferredInstallPrompt = null;
   let installDismissed = false;
@@ -414,11 +436,26 @@
           <button data-tab="weight" class="${state.tab==='weight'?'active':''}">${icon('scale')}Weight</button>
           <button data-tab="injection" class="${state.tab==='injection'?'active':''}">${icon('syringe')}Shot</button>
         </nav>
+        ${state.needsOnboardCheck ? `
+          <div class="onboard-overlay">
+            <div class="onboard-card">
+              <h2>No data on this device</h2>
+              <p>This device has no weight or injection entries yet. If you already have a backup on your server, restore it now — before logging anything — so a first entry doesn't overwrite your history.</p>
+              <button class="btn btn-teal" id="onboard-restore">Restore from backup</button>
+              <button class="btn" style="background:var(--border-light)" id="onboard-fresh">Start fresh, no backup to restore</button>
+            </div>
+          </div>` : ""}
       </div>`;
     attachHandlers();
   }
 
   function attachHandlers(){
+    if (state.needsOnboardCheck){
+      const onboardRestore = document.getElementById("onboard-restore");
+      if (onboardRestore) onboardRestore.addEventListener("click", () => restoreFromServer(true));
+      const onboardFresh = document.getElementById("onboard-fresh");
+      if (onboardFresh) onboardFresh.addEventListener("click", dismissOnboardCheck);
+    }
     const installBtn = document.getElementById("install-btn");
     if (installBtn) installBtn.addEventListener("click", async () => {
       if (!deferredInstallPrompt) return;
