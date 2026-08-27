@@ -27,8 +27,8 @@
   .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
   .app{max-width:448px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;}
   header{padding:20px 16px 12px;border-bottom:1px solid var(--border);text-align:center;}
-  header .eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:500;}
-  header h1{font-size:20px;font-weight:600;margin:0;margin-top:-2px;}
+  header .eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:500;}
+  header h1{font-size:23px;font-weight:600;margin:0;margin-top:-2px;}
   .install-banner{background:var(--teal-btn);color:white;padding:10px 16px;display:flex;align-items:center;
     justify-content:space-between;gap:12px;font-size:13px;}
   .install-banner-actions{display:flex;align-items:center;gap:4px;flex-shrink:0;}
@@ -38,24 +38,24 @@
   main{flex:1;padding:16px;padding-bottom:96px;display:flex;flex-direction:column;gap:16px;}
   .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;
     box-shadow:0 1px 8px rgba(0,0,0,.3);}
-  .section-title{font-size:12px;text-transform:uppercase;letter-spacing:.04em;font-weight:600;margin-bottom:12px;
+  .section-title{font-size:13px;text-transform:uppercase;letter-spacing:.04em;font-weight:600;margin-bottom:12px;
     display:flex;align-items:center;gap:6px;}
   .section-title.teal{color:var(--teal);}
   .section-title.amber{color:var(--amber);}
   .section-title.dim{color:var(--dim);}
   .row-between{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
-  .link-btn{background:none;border:none;color:var(--faint);font-size:12px;display:flex;align-items:center;gap:4px;
+  .link-btn{background:none;border:none;color:var(--faint);font-size:13px;display:flex;align-items:center;gap:4px;
     cursor:pointer;padding:0;}
   .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px 16px;}
-  .stat-label{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint2);font-weight:500;}
-  .stat-value{font-size:20px;font-weight:600;line-height:1.2;margin-top:2px;}
-  .stat-sub{font-size:11px;color:var(--faint);margin-top:2px;}
-  .muted{color:var(--faint);font-size:14px;padding:8px 0;}
-  .empty-chart{color:var(--faint);font-size:14px;text-align:center;padding:24px 0;}
-  .field{font-size:12px;color:var(--dim);display:block;}
+  .stat-label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint2);font-weight:500;}
+  .stat-value{font-size:24px;font-weight:600;line-height:1.2;margin-top:2px;}
+  .stat-sub{font-size:12px;color:var(--faint);margin-top:2px;}
+  .muted{color:var(--faint);font-size:15px;padding:8px 0;}
+  .empty-chart{color:var(--faint);font-size:15px;text-align:center;padding:24px 0;}
+  .field{font-size:13px;color:var(--dim);display:block;}
   .field.full{grid-column:span 2;}
   .field input,.field select{width:100%;margin-top:4px;background:var(--card);color:var(--text);
-    border:1px solid var(--border-light);border-radius:8px;padding:9px 8px;font-size:14px;
+    border:1px solid var(--border-light);border-radius:8px;padding:10px 8px;font-size:15px;
     font-family:inherit;color-scheme:dark;}
   .field input::placeholder{color:var(--faint2);}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
@@ -64,10 +64,10 @@
   .onboard-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;
     max-width:360px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.5);}
   .onboard-card h2{font-size:16px;margin:0 0 8px;}
-  .onboard-card p{font-size:13px;color:var(--dim);line-height:1.5;margin:0 0 16px;}
+  .onboard-card p{font-size:14px;color:var(--dim);line-height:1.5;margin:0 0 16px;}
   .onboard-card .btn{margin-bottom:8px;}
   .onboard-card .btn:last-child{margin-bottom:0;}
-  .btn{width:100%;border:none;border-radius:8px;padding:11px;font-size:14px;font-weight:500;color:white;
+  .btn{width:100%;border:none;border-radius:8px;padding:12px;font-size:15px;font-weight:500;color:white;
     display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;margin-top:12px;}
   .btn-teal{background:var(--teal-btn);}
   .btn-teal:active{background:var(--teal-btn-active);}
@@ -78,8 +78,8 @@
     border-top:1px solid var(--border);}
   .history-row:first-child{border-top:none;}
   .history-row.editing{opacity:.55;}
-  .history-main .line1{font-size:14px;}
-  .history-main .line2{font-size:12px;color:var(--faint);margin-top:1px;}
+  .history-main .line1{font-size:15px;}
+  .history-main .line2{font-size:13px;color:var(--faint);margin-top:1px;}
   .history-actions{display:flex;align-items:center;gap:2px;}
   .icon-btn{background:none;border:none;color:var(--faint2);padding:6px;cursor:pointer;display:flex;}
   .icon-btn.edit:active{color:var(--teal);}
@@ -88,10 +88,10 @@
   nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--border);
     display:flex;max-width:448px;margin:0 auto;width:100%;}
   nav button{flex:1;background:none;border:none;color:var(--faint);display:flex;flex-direction:column;
-    align-items:center;gap:2px;padding:10px 0;font-size:11px;font-weight:500;cursor:pointer;
+    align-items:center;gap:3px;padding:10px 0;font-size:12px;font-weight:500;cursor:pointer;
     font-family:inherit;}
   nav button.active{color:var(--teal);}
-  svg.icon{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+  svg.icon{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
 </style>
 </head>
 <body>
@@ -103,14 +103,14 @@
   // ---------- icons ----------
   const ICONS = {
     home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>',
-    scale: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
-    syringe: '<path d="M18.5 2.5l3 3M16 5l-1.5-1.5M9 9L3 15l-1 4 4-1 6-6M12 6l6 6M10 8l6 6"/>',
+    syringe: '<path d="m18 2 4 4"/><path d="m17 7 3-3"/><path d="M19 9 8.7 19.3c-1 1-2.5 1-3.4 0l-.6-.6c-1-1-1-2.5 0-3.4L15 5"/><path d="m9 11 4 4"/><path d="m5 19-3 3"/><path d="m14 4 6 6"/><circle cx="6.3" cy="17.7" r=".5" fill="currentColor" stroke="none"/>',
     pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
     trash: '<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14Z"/>',
     plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
     x: '<path d="M18 6 6 18"/><path d="M6 6l12 12"/>',
   };
-  function icon(name){ return '<svg class="icon" viewBox="0 0 24 24">'+ICONS[name]+'</svg>'; }
+  function icon(name){ if (name === 'scale') return SCALE_ICON_SVG; return '<svg class="icon" viewBox="0 0 24 24">'+ICONS[name]+'</svg>'; }
+  const SCALE_ICON_SVG = '<svg class="icon" viewBox="0 0 324 323.957663" style="fill:currentColor;stroke:none"><g transform="translate(-94,417.957663) scale(0.1,-0.1)"><path d="M1288 4161 c-158 -51 -280 -173 -328 -329 -19 -62 -20 -95 -20 -1272 0 -1172 1 -1210 20 -1271 48 -157 172 -281 328 -329 62 -19 95 -20 1272 -20 1177 0 1210 1 1272 20 156 48 280 172 328 329 19 61 20 99 20 1271 0 1172 -1 1210 -20 1271 -48 157 -172 281 -328 329 -62 20 -95 20 -1276 19 -1143 0 -1214 -1 -1268 -18z m2537 -171 c64 -31 134 -101 165 -165 l25 -50 0 -1215 0 -1215 -25 -50 c-31 -64 -101 -134 -165 -165 l-50 -25 -1215 0 -1215 0 -50 25 c-64 31 -134 101 -165 165 l-25 50 -3 1195 c-3 1325 -6 1246 63 1342 19 25 53 60 77 76 95 65 11 61 1333 59 l1200 -2 50 -25z"/><path d="M2440 3814 c-267 -34 -491 -139 -680 -320 -94 -90 -119 -132 -104 -172 6 -16 75 -128 153 -250 117 -181 148 -223 173 -231 43 -15 1113 -15 1156 0 25 8 56 50 171 229 77 120 146 229 152 243 18 40 4 72 -67 147 -160 169 -369 285 -606 336 -73 15 -282 26 -348 18z m40 -194 c0 -41 39 -80 80 -80 42 0 80 39 80 81 l0 32 62 -7 c63 -8 202 -47 251 -72 23 -12 27 -21 27 -58 0 -78 80 -118 134 -67 l23 22 49 -39 c69 -55 97 -89 91 -106 -7 -18 -186 -297 -201 -314 -9 -9 -56 -12 -189 -10 l-176 3 91 145 c103 164 112 196 64 236 -31 28 -62 30 -93 9 -11 -8 -74 -100 -139 -205 l-117 -190 -235 2 -235 3 -104 160 c-56 88 -103 165 -103 170 0 12 67 78 114 114 l29 21 24 -21 c53 -51 133 -11 133 67 0 37 4 45 28 57 63 32 217 74 280 76 29 1 32 -2 32 -29z"/></g></svg>';
 
   // ---------- constants ----------
   const SITES = [
