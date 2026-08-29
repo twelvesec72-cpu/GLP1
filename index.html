@@ -82,6 +82,9 @@
   .history-main .line2{font-size:13px;color:var(--faint);margin-top:1px;}
   .history-actions{display:flex;align-items:center;gap:2px;}
   .icon-btn{background:none;border:none;color:var(--faint2);padding:6px;cursor:pointer;display:flex;}
+  .photo-nav-btn{background:var(--border-light);border:none;border-radius:50%;color:var(--text);width:36px;height:36px;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+  .photo-nav-btn:disabled{opacity:.35;cursor:default;}
   .icon-btn.edit:active{color:var(--teal);}
   .icon-btn.edit-amber:active{color:var(--amber);}
   .icon-btn.del:active{color:var(--red);}
@@ -103,6 +106,9 @@
   // ---------- icons ----------
   const ICONS = {
     home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>',
+    chevronLeft: '<path d="M15 18l-6-6 6-6"/>',
+    chevronRight: '<path d="M9 18l6-6-6-6"/>',
+    camera: '<path d="M14.5 5h-5L7.8 7.6H4.5a2 2 0 0 0-2 2v8.4a2 2 0 0 0 2 2h15a2 2 0 0 0 2-2V9.6a2 2 0 0 0-2-2h-3.3z"/><circle cx="12" cy="13" r="3.6"/>',
     syringe: '<path d="m18 2 4 4"/><path d="m17 7 3-3"/><path d="M19 9 8.7 19.3c-1 1-2.5 1-3.4 0l-.6-.6c-1-1-1-2.5 0-3.4L15 5"/><path d="m9 11 4 4"/><path d="m5 19-3 3"/><path d="m14 4 6 6"/><circle cx="6.3" cy="17.7" r=".5" fill="currentColor" stroke="none"/>',
     pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
     trash: '<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14Z"/>',
@@ -209,6 +215,224 @@
     render();
   }
 
+  // ---------- progress photos: IndexedDB cache (local device) ----------
+  const PHOTO_DB_NAME = "glp1-photos";
+  const PHOTO_STORE = "photos";
+  function openPhotoDB(){
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(PHOTO_DB_NAME, 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore(PHOTO_STORE); };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function idbGetPhoto(date){
+    const db = await openPhotoDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(PHOTO_STORE, "readonly");
+      const req = tx.objectStore(PHOTO_STORE).get(date);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function idbSetPhoto(date, blob){
+    const db = await openPhotoDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(PHOTO_STORE, "readwrite");
+      tx.objectStore(PHOTO_STORE).put(blob, date);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+  async function idbDeletePhoto(date){
+    const db = await openPhotoDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(PHOTO_STORE, "readwrite");
+      tx.objectStore(PHOTO_STORE).delete(date);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+  async function idbListDates(){
+    const db = await openPhotoDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(PHOTO_STORE, "readonly");
+      const req = tx.objectStore(PHOTO_STORE).getAllKeys();
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  // ---------- progress photos: capture + compress ----------
+  async function compressPhoto(file, maxDim, quality){
+    maxDim = maxDim || 1080; quality = quality || 0.8;
+    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    let { width, height } = bitmap;
+    if (width > maxDim || height > maxDim) {
+      if (width > height) { height = Math.round(height * (maxDim / width)); width = maxDim; }
+      else { width = Math.round(width * (maxDim / height)); height = maxDim; }
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = width; canvas.height = height;
+    canvas.getContext("2d").drawImage(bitmap, 0, 0, width, height);
+    return new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", quality));
+  }
+
+  // ---------- progress photos: server sync ----------
+  function blobToBase64(blob){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result.split(",")[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+  async function uploadPhotoToServer(date, blob){
+    try {
+      const base64 = await blobToBase64(blob);
+      const res = await fetch(BACKUP_URL + "/photos/" + date, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Api-Key": BACKUP_API_KEY },
+        body: JSON.stringify({ image: base64 }),
+      });
+      return res.ok;
+    } catch (e) { console.error("photo upload failed", e); return false; }
+  }
+  async function fetchPhotoFromServer(date){
+    const res = await fetch(BACKUP_URL + "/photos/" + date, { headers: { "X-Api-Key": BACKUP_API_KEY } });
+    if (!res.ok) throw new Error("not found");
+    return await res.blob();
+  }
+  async function fetchServerPhotoDates(){
+    try {
+      const res = await fetch(BACKUP_URL + "/photos", { headers: { "X-Api-Key": BACKUP_API_KEY } });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.dates || [];
+    } catch (e) { return []; }
+  }
+  async function deletePhotoEverywhere(date){
+    await idbDeletePhoto(date);
+    try {
+      await fetch(BACKUP_URL + "/photos/" + date, { method: "DELETE", headers: { "X-Api-Key": BACKUP_API_KEY } });
+    } catch (e) { /* offline is fine, it's already gone locally */ }
+  }
+
+  // ---------- progress photos: tab state + loading ----------
+  async function loadPhotosTab(){
+    const localDates = await idbListDates();
+    const serverDates = await fetchServerPhotoDates();
+    const merged = Array.from(new Set([...localDates, ...serverDates])).sort();
+    state.photoTimeline = merged;
+    if (merged.length > 0 && (state.photoIndex == null || state.photoIndex >= merged.length)) {
+      state.photoIndex = merged.length - 1;
+    }
+    render();
+    if (merged.length > 0) ensurePhotoLoaded(merged[state.photoIndex]);
+  }
+
+  async function ensurePhotoLoaded(date){
+    if (state.photoCache[date]) { updatePhotoDisplay(); return; }
+    let blob = await idbGetPhoto(date);
+    if (!blob) {
+      try { blob = await fetchPhotoFromServer(date); await idbSetPhoto(date, blob); }
+      catch (e) { state.photoCache[date] = "error"; updatePhotoDisplay(); return; }
+    }
+    state.photoCache[date] = URL.createObjectURL(blob);
+    updatePhotoDisplay();
+  }
+
+  // Updates just the photo <img>, status text, and labels in place — avoids
+  // rebuilding the whole screen on every slider drag tick, which was both
+  // choppy and caused the image to flicker blank mid-drag.
+  function updatePhotoDisplay(){
+    const timeline = state.photoTimeline;
+    const idx = state.photoIndex || 0;
+    const date = timeline[idx];
+    const cached = date ? state.photoCache[date] : null;
+    const img = document.getElementById("photo-img");
+    const status = document.getElementById("photo-status");
+    const dateLabel = document.getElementById("photo-date-label");
+    const countLabel = document.getElementById("photo-count-label");
+    const slider = document.getElementById("photo-slider");
+    const prevBtn = document.getElementById("photo-prev");
+    const nextBtn = document.getElementById("photo-next");
+    if (!img) return; // photos tab isn't currently on screen
+
+    if (cached && cached !== "error") {
+      img.src = cached; img.style.display = "block";
+      if (status) status.style.display = "none";
+    } else {
+      img.style.display = "none";
+      if (status) {
+        status.style.display = "block";
+        status.textContent = cached === "error" ? "Couldn't load this photo. Check you're connected to Tailscale." : "Loading…";
+      }
+      if (!cached) ensurePhotoLoaded(date);
+    }
+    if (dateLabel) dateLabel.textContent = fmtDateShort(date);
+    if (countLabel) countLabel.textContent = (idx + 1) + " of " + timeline.length;
+    if (slider) slider.value = idx;
+    if (prevBtn) prevBtn.disabled = idx <= 0;
+    if (nextBtn) nextBtn.disabled = idx >= timeline.length - 1;
+  }
+
+  // ---------- TEMPORARY: generate sample photos to preview the slider ----------
+  function generateSampleBlob(label, colorFrom, colorTo){
+    const canvas = document.createElement("canvas");
+    canvas.width = 600; canvas.height = 800;
+    const ctx = canvas.getContext("2d");
+    const grad = ctx.createLinearGradient(0, 0, 0, 800);
+    grad.addColorStop(0, colorFrom);
+    grad.addColorStop(1, colorTo);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 600, 800);
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.font = "bold 48px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(label, 300, 400);
+    ctx.font = "24px sans-serif";
+    ctx.fillText("(sample test image)", 300, 450);
+    return new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.85));
+  }
+  async function loadSamplePhotos(){
+    state.photoUploading = true; render();
+    const colors = [["#2dd4bf","#134e4a"],["#22c55e","#14532d"],["#eab308","#713f12"],["#f97316","#7c2d12"],["#ef4444","#7f1d1d"]];
+    for (let i = 4; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const date = d.toISOString().slice(0, 10);
+      const [from, to] = colors[4 - i];
+      const blob = await generateSampleBlob("Day " + (5 - i), from, to);
+      await idbSetPhoto(date, blob);
+      if (state.photoCache[date]) URL.revokeObjectURL(state.photoCache[date]);
+      state.photoCache[date] = URL.createObjectURL(blob);
+      if (!state.photoTimeline.includes(date)) state.photoTimeline.push(date);
+      await uploadPhotoToServer(date, blob);
+    }
+    state.photoTimeline.sort();
+    state.photoIndex = state.photoTimeline.length - 1;
+    state.photoUploading = false;
+    render();
+  }
+
+  async function handlePhotoCapture(file){
+    const date = todayStr();
+    state.photoUploading = true; render();
+    const blob = await compressPhoto(file);
+    await idbSetPhoto(date, blob);
+    if (state.photoCache[date]) URL.revokeObjectURL(state.photoCache[date]);
+    state.photoCache[date] = URL.createObjectURL(blob);
+    if (!state.photoTimeline.includes(date)) {
+      state.photoTimeline.push(date);
+      state.photoTimeline.sort();
+    }
+    state.photoIndex = state.photoTimeline.indexOf(date);
+    state.photoUploading = false;
+    render();
+    uploadPhotoToServer(date, blob);
+  }
+
   // ---------- state ----------
   const state = {
     tab: "home",
@@ -221,6 +445,10 @@
   };
   state.needsOnboardCheck = !localStorage.getItem("glp1-onboarded")
     && state.weightEntries.length === 0 && state.injections.length === 0;
+  state.photoTimeline = [];
+  state.photoIndex = null;
+  state.photoCache = {};
+  state.photoUploading = false;
 
   let deferredInstallPrompt = null;
   let installDismissed = false;
@@ -415,9 +643,61 @@
       </div>`;
   }
 
+  function renderPhotosTab(){
+    const timeline = state.photoTimeline;
+    const hasPhotos = timeline.length > 0;
+    const idx = state.photoIndex || 0;
+    const currentDate = hasPhotos ? timeline[idx] : null;
+    const cached = currentDate ? state.photoCache[currentDate] : null;
+    const today = todayStr();
+    const hasToday = timeline.includes(today);
+
+    let statusText = "";
+    let imgSrc = "";
+    let imgVisible = false;
+    if (!hasPhotos) {
+      statusText = "No progress photos yet. Take your first one below.";
+    } else if (cached === "error") {
+      statusText = "Couldn't load this photo. Check you're connected to Tailscale.";
+    } else if (!cached) {
+      statusText = "Loading…";
+    } else {
+      imgSrc = cached; imgVisible = true;
+    }
+
+    const scrubber = hasPhotos ? `
+      <div style="display:flex;align-items:center;gap:10px;margin-top:14px">
+        <button class="photo-nav-btn" id="photo-prev" aria-label="Previous photo" ${idx<=0?"disabled":""}>${icon('chevronLeft')}</button>
+        <input type="range" id="photo-slider" min="0" max="${timeline.length - 1}" value="${idx}" style="flex:1">
+        <button class="photo-nav-btn" id="photo-next" aria-label="Next photo" ${idx>=timeline.length-1?"disabled":""}>${icon('chevronRight')}</button>
+      </div>
+      <div class="row-between" style="margin-top:6px">
+        <div class="muted" id="photo-date-label" style="padding:0">${esc(fmtDateShort(currentDate))}</div>
+        <div class="muted" id="photo-count-label" style="padding:0">${idx + 1} of ${timeline.length}</div>
+      </div>` : "";
+
+    return `
+      <div class="card">
+        <div class="section-title dim">Progress photos</div>
+        <div style="position:relative">
+          <img id="photo-img" src="${imgSrc}" alt="Progress photo" style="width:100%;border-radius:10px;max-height:60vh;object-fit:contain;background:#000;display:${imgVisible?"block":"none"}">
+          <div class="empty-chart" id="photo-status" style="padding:48px 0;display:${imgVisible?"none":"block"}">${statusText}</div>
+        </div>
+        ${scrubber}
+      </div>
+      <div class="card">
+        <input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none">
+        <button class="btn btn-teal" id="photo-capture-btn" ${state.photoUploading ? "disabled" : ""}>
+          ${state.photoUploading ? "Uploading…" : (hasToday ? icon('camera') + " Retake today's photo" : icon('camera') + " Take today's photo")}
+        </button>
+        ${hasPhotos ? `<button class="link-btn" id="photo-delete-btn" style="margin-top:10px">${icon('trash')} Delete this day's photo</button>` : ""}
+        <button class="link-btn" id="photo-load-sample" style="margin-top:10px;color:var(--amber)">${icon('camera')} [TEMP] Load 5 sample photos to test slider</button>
+      </div>`;
+  }
+
   // ---------- shell + handlers ----------
   function render(){
-    const body = state.tab === "home" ? renderHome() : state.tab === "weight" ? renderWeightTab() : renderInjectionTab();
+    const body = state.tab === "home" ? renderHome() : state.tab === "weight" ? renderWeightTab() : state.tab === "injection" ? renderInjectionTab() : renderPhotosTab();
     const showInstallBanner = deferredInstallPrompt && !installDismissed;
     document.getElementById("app").innerHTML = `
       <div class="app">
@@ -435,6 +715,7 @@
           <button data-tab="home" class="${state.tab==='home'?'active':''}">${icon('home')}Home</button>
           <button data-tab="weight" class="${state.tab==='weight'?'active':''}">${icon('scale')}Weight</button>
           <button data-tab="injection" class="${state.tab==='injection'?'active':''}">${icon('syringe')}Shot</button>
+          <button data-tab="photos" class="${state.tab==='photos'?'active':''}">${icon('camera')}Photos</button>
         </nav>
         ${state.needsOnboardCheck ? `
           <div class="onboard-overlay">
@@ -468,7 +749,11 @@
     if (dismissBtn) dismissBtn.addEventListener("click", () => { installDismissed = true; render(); });
 
     document.querySelectorAll("[data-tab]").forEach(btn => {
-      btn.addEventListener("click", () => { state.tab = btn.dataset.tab; render(); });
+      btn.addEventListener("click", () => {
+        state.tab = btn.dataset.tab;
+        render();
+        if (state.tab === "photos") loadPhotosTab();
+      });
     });
 
     if (state.tab === "home"){
@@ -476,6 +761,44 @@
       if (backupBtn) backupBtn.addEventListener("click", syncToServer);
       const restoreBtn = document.getElementById("restore-backup");
       if (restoreBtn) restoreBtn.addEventListener("click", restoreFromServer);
+    }
+
+    if (state.tab === "photos"){
+      const captureBtn = document.getElementById("photo-capture-btn");
+      const fileInput = document.getElementById("photo-input");
+      if (captureBtn && fileInput) {
+        captureBtn.addEventListener("click", () => fileInput.click());
+        fileInput.addEventListener("change", (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (file) handlePhotoCapture(file);
+          fileInput.value = "";
+        });
+      }
+      const slider = document.getElementById("photo-slider");
+      if (slider) slider.addEventListener("input", (e) => {
+        state.photoIndex = parseInt(e.target.value, 10);
+        updatePhotoDisplay();
+      });
+      const prevBtn = document.getElementById("photo-prev");
+      if (prevBtn) prevBtn.addEventListener("click", () => {
+        if (state.photoIndex > 0) { state.photoIndex--; updatePhotoDisplay(); }
+      });
+      const nextBtn = document.getElementById("photo-next");
+      if (nextBtn) nextBtn.addEventListener("click", () => {
+        if (state.photoIndex < state.photoTimeline.length - 1) { state.photoIndex++; updatePhotoDisplay(); }
+      });
+      const deleteBtn = document.getElementById("photo-delete-btn");
+      if (deleteBtn) deleteBtn.addEventListener("click", async () => {
+        const date = state.photoTimeline[state.photoIndex];
+        if (!confirm(`Delete the photo from ${fmtDateShort(date)}? This removes it from this device and the server.`)) return;
+        await deletePhotoEverywhere(date);
+        state.photoTimeline = state.photoTimeline.filter(d => d !== date);
+        delete state.photoCache[date];
+        state.photoIndex = Math.max(0, state.photoIndex - 1);
+        render();
+      });
+      const sampleBtn = document.getElementById("photo-load-sample");
+      if (sampleBtn) sampleBtn.addEventListener("click", loadSamplePhotos);
     }
 
     if (state.tab === "weight"){
