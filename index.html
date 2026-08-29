@@ -377,44 +377,6 @@
     if (nextBtn) nextBtn.disabled = idx >= timeline.length - 1;
   }
 
-  // ---------- TEMPORARY: generate sample photos to preview the slider ----------
-  function generateSampleBlob(label, colorFrom, colorTo){
-    const canvas = document.createElement("canvas");
-    canvas.width = 600; canvas.height = 800;
-    const ctx = canvas.getContext("2d");
-    const grad = ctx.createLinearGradient(0, 0, 0, 800);
-    grad.addColorStop(0, colorFrom);
-    grad.addColorStop(1, colorTo);
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 600, 800);
-    ctx.fillStyle = "rgba(255,255,255,0.9)";
-    ctx.font = "bold 48px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(label, 300, 400);
-    ctx.font = "24px sans-serif";
-    ctx.fillText("(sample test image)", 300, 450);
-    return new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.85));
-  }
-  async function loadSamplePhotos(){
-    state.photoUploading = true; render();
-    const colors = [["#2dd4bf","#134e4a"],["#22c55e","#14532d"],["#eab308","#713f12"],["#f97316","#7c2d12"],["#ef4444","#7f1d1d"]];
-    for (let i = 4; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const date = d.toISOString().slice(0, 10);
-      const [from, to] = colors[4 - i];
-      const blob = await generateSampleBlob("Day " + (5 - i), from, to);
-      await idbSetPhoto(date, blob);
-      if (state.photoCache[date]) URL.revokeObjectURL(state.photoCache[date]);
-      state.photoCache[date] = URL.createObjectURL(blob);
-      if (!state.photoTimeline.includes(date)) state.photoTimeline.push(date);
-      await uploadPhotoToServer(date, blob);
-    }
-    state.photoTimeline.sort();
-    state.photoIndex = state.photoTimeline.length - 1;
-    state.photoUploading = false;
-    render();
-  }
 
   async function handlePhotoCapture(file){
     const date = todayStr();
@@ -691,7 +653,6 @@
           ${state.photoUploading ? "Uploading…" : (hasToday ? icon('camera') + " Retake today's photo" : icon('camera') + " Take today's photo")}
         </button>
         ${hasPhotos ? `<button class="link-btn" id="photo-delete-btn" style="margin-top:10px">${icon('trash')} Delete this day's photo</button>` : ""}
-        <button class="link-btn" id="photo-load-sample" style="margin-top:10px;color:var(--amber)">${icon('camera')} [TEMP] Load 5 sample photos to test slider</button>
       </div>`;
   }
 
@@ -797,8 +758,6 @@
         state.photoIndex = Math.max(0, state.photoIndex - 1);
         render();
       });
-      const sampleBtn = document.getElementById("photo-load-sample");
-      if (sampleBtn) sampleBtn.addEventListener("click", loadSamplePhotos);
     }
 
     if (state.tab === "weight"){
