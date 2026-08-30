@@ -262,8 +262,8 @@
     if (!cachedSubscription) { alert('Notifications aren\'t enabled yet — tap "Enable notifications" first.'); return; }
     const config = {
       subscription: cachedSubscription.toJSON ? cachedSubscription.toJSON() : cachedSubscription,
-      weight: { enabled: document.getElementById("rem-weight-enabled").checked, time: document.getElementById("rem-weight-time").value },
-      photo: { enabled: document.getElementById("rem-photo-enabled").checked, time: document.getElementById("rem-photo-time").value },
+      weight: { enabled: document.getElementById("rem-weight-enabled").checked, day: document.getElementById("rem-weight-day").value, time: document.getElementById("rem-weight-time").value },
+      photo: { enabled: document.getElementById("rem-photo-enabled").checked, day: document.getElementById("rem-photo-day").value, time: document.getElementById("rem-photo-time").value },
       shot: { enabled: document.getElementById("rem-shot-enabled").checked, day: document.getElementById("rem-shot-day").value, time: document.getElementById("rem-shot-time").value },
     };
     // Capture state from the form BEFORE re-rendering (the "Saving…" render below
@@ -303,7 +303,7 @@
     }
     return opts.join("");
   }
-  const DAY_LABELS = { sun: "Sunday", mon: "Monday", tue: "Tuesday", wed: "Wednesday", thu: "Thursday", fri: "Friday", sat: "Saturday" };
+  const DAY_LABELS = { all: "Every day", sun: "Sunday", mon: "Monday", tue: "Tuesday", wed: "Wednesday", thu: "Thursday", fri: "Friday", sat: "Saturday" };
   function dayOptions(selected){
     return Object.entries(DAY_LABELS).map(([val, label]) =>
       `<option value="${val}" ${val === selected ? "selected" : ""}>${label}</option>`).join("");
@@ -326,11 +326,17 @@
       <div class="section-title dim">Reminders</div>
       <div class="reminder-row">
         <label><input type="checkbox" id="rem-weight-enabled" ${r.weight.enabled ? "checked" : ""}> Weight check-in</label>
-        <select id="rem-weight-time">${timeOptions(r.weight.time)}</select>
+        <div style="display:flex;gap:6px">
+          <select id="rem-weight-day">${dayOptions(r.weight.day)}</select>
+          <select id="rem-weight-time">${timeOptions(r.weight.time)}</select>
+        </div>
       </div>
       <div class="reminder-row">
         <label><input type="checkbox" id="rem-photo-enabled" ${r.photo.enabled ? "checked" : ""}> Progress photo</label>
-        <select id="rem-photo-time">${timeOptions(r.photo.time)}</select>
+        <div style="display:flex;gap:6px">
+          <select id="rem-photo-day">${dayOptions(r.photo.day)}</select>
+          <select id="rem-photo-time">${timeOptions(r.photo.time)}</select>
+        </div>
       </div>
       <div class="reminder-row">
         <label><input type="checkbox" id="rem-shot-enabled" ${r.shot.enabled ? "checked" : ""}> Injection day</label>
@@ -549,8 +555,8 @@
   state.photoCache = {};
   state.photoUploading = false;
   state.reminders = JSON.parse(localStorage.getItem("glp1-reminders") || "null") || {
-    weight: { enabled: false, time: "08:00" },
-    photo: { enabled: false, time: "08:00" },
+    weight: { enabled: false, day: "all", time: "08:00" },
+    photo: { enabled: false, day: "all", time: "08:00" },
     shot: { enabled: false, day: "sun", time: "09:00" },
   };
   state.pushPermission = (typeof Notification !== "undefined") ? Notification.permission : "unsupported";
