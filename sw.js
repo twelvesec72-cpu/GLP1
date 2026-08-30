@@ -1,4 +1,4 @@
-const CACHE_NAME = "glp1-tracker-v2";
+const CACHE_NAME = "glp1-tracker-v3";
 const ASSETS = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (event) => {
@@ -28,5 +28,31 @@ self.addEventListener("fetch", (event) => {
         return response;
       })
       .catch(() => caches.match(event.request))
+  );
+});
+
+// ---------- push notification reminders (weight / photo / shot) ----------
+self.addEventListener("push", (event) => {
+  let data = { title: "GLP-1 Tracker", body: "You have a reminder." };
+  try { if (event.data) data = event.data.json(); } catch (e) {
+    if (event.data) data.body = event.data.text();
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: "./icon-192.png",
+      badge: "./icon-192.png",
+      tag: data.tag || "reminder",
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: "window" }).then((clientList) => {
+      for (const client of clientList) { if ("focus" in client) return client.focus(); }
+      if (self.clients.openWindow) return self.clients.openWindow("./");
+    })
   );
 });

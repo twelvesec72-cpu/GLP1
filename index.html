@@ -85,6 +85,11 @@
   .photo-nav-btn{background:var(--border-light);border:none;border-radius:50%;color:var(--text);width:36px;height:36px;
     display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
   .photo-nav-btn:disabled{opacity:.35;cursor:default;}
+  .reminder-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;flex-wrap:wrap;}
+  .reminder-row label{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--text);}
+  .reminder-row select{background:var(--card);color:var(--text);border:1px solid var(--border-light);
+    border-radius:6px;padding:6px 8px;font-size:13px;}
+  .reminder-row select:disabled{opacity:.4;}
   .icon-btn.edit:active{color:var(--teal);}
   .icon-btn.edit-amber:active{color:var(--amber);}
   .icon-btn.del:active{color:var(--red);}
@@ -156,6 +161,7 @@
   // ---------- server backup (dellcasa, tailnet-only) ----------
   const BACKUP_URL = "https://dellcasa-1.tail2b3657.ts.net:8096";
   const BACKUP_API_KEY = "e7sBUgDU7zqXWZFfnyEfAY2hUMaDI9zq"; // tailnet-only endpoint; key is defense-in-depth, not the only protection
+  const VAPID_PUBLIC_KEY = "BAAE2xbdgVR3BMJxaAW6An6BBbtiuznzx-Uxsl4qKxu2v140jVqdsT9Fgz2-32rNIvG6YFDJrSxgqIlH0CQryRg";
   let syncStatus = "idle"; // idle | syncing | ok | error
   let lastSyncedAt = localStorage.getItem("glp1-last-synced") || null;
   let syncTimer = null;
@@ -207,6 +213,137 @@
       console.error("restore failed", e);
       alert("Restore failed. Make sure this device is connected to Tailscale.");
     }
+  }
+
+  // ---------- reminders: push notification setup ----------
+  function urlBase64ToUint8Array(base64String){
+    const padding = "=".repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData = atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+    return outputArray;
+  }
+
+  async function initPush(){
+    if (typeof Notification === "undefined" || !("serviceWorker" in navigator)) {
+      state.pushPermission = "unsupported"; return;
+    }
+    state.pushPermission = Notification.permission;
+    if (Notification.permission === "granted") {
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        cachedSubscription = await reg.pushManager.getSubscription();
+      } catch (e) { console.error("push init failed", e); }
+    }
+    render();
+  }
+
+  async function enablePushNotifications(){
+    if (typeof Notification === "undefined") { alert("Notifications aren't supported in this browser."); return; }
+    const perm = await Notification.requestPermission();
+    state.pushPermission = perm;
+    if (perm !== "granted") { render(); return; }
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        });
+      }
+      cachedSubscription = sub;
+    } catch (e) { console.error("subscribe failed", e); alert("Couldn't set up push notifications: " + e.message); }
+    render();
+  }
+
+  async function saveRemindersToServer(){
+    if (!cachedSubscription) { alert('Notifications aren\'t enabled yet — tap "Enable notifications" first.'); return; }
+    const config = {
+      subscription: cachedSubscription.toJSON ? cachedSubscription.toJSON() : cachedSubscription,
+      weight: { enabled: document.getElementById("rem-weight-enabled").checked, time: document.getElementById("rem-weight-time").value },
+      photo: { enabled: document.getElementById("rem-photo-enabled").checked, time: document.getElementById("rem-photo-time").value },
+      shot: { enabled: document.getElementById("rem-shot-enabled").checked, day: document.getElementById("rem-shot-day").value, time: document.getElementById("rem-shot-time").value },
+    };
+    // Capture state from the form BEFORE re-rendering (the "Saving…" render below
+    // rebuilds these inputs from state.reminders, so state must already match
+    // what was just read or the user's picks would get reverted mid-save).
+    state.reminders = { weight: config.weight, photo: config.photo, shot: config.shot };
+    localStorage.setItem("glp1-reminders", JSON.stringify(state.reminders));
+    state.reminderSaveStatus = "saving"; render();
+    try {
+      const res = await fetch(BACKUP_URL + "/reminders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Api-Key": BACKUP_API_KEY },
+        body: JSON.stringify(config),
+      });
+      state.reminderSaveStatus = res.ok ? "ok" : "error";
+    } catch (e) { state.reminderSaveStatus = "error"; }
+    render();
+  }
+
+  async function sendTestReminder(){
+    try {
+      const res = await fetch(BACKUP_URL + "/reminders/test", { method: "POST", headers: { "X-Api-Key": BACKUP_API_KEY } });
+      alert(res.ok ? "Test sent — you should get a notification shortly." : "Test failed — save your reminders at least once first.");
+    } catch (e) { alert("Couldn't reach the server. Check you're connected to Tailscale."); }
+  }
+
+  function timeOptions(selected){
+    const opts = [];
+    for (let h = 0; h < 24; h++) {
+      for (let m = 0; m < 60; m += 30) {
+        const val = String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
+        const period = h < 12 ? "AM" : "PM";
+        const h12 = h % 12 === 0 ? 12 : h % 12;
+        const label = h12 + ":" + String(m).padStart(2, "0") + " " + period;
+        opts.push(`<option value="${val}" ${val === selected ? "selected" : ""}>${label}</option>`);
+      }
+    }
+    return opts.join("");
+  }
+  const DAY_LABELS = { sun: "Sunday", mon: "Monday", tue: "Tuesday", wed: "Wednesday", thu: "Thursday", fri: "Friday", sat: "Saturday" };
+  function dayOptions(selected){
+    return Object.entries(DAY_LABELS).map(([val, label]) =>
+      `<option value="${val}" ${val === selected ? "selected" : ""}>${label}</option>`).join("");
+  }
+
+  function renderRemindersCard(){
+    if (state.pushPermission === "unsupported") {
+      return `<div class="card"><div class="section-title dim">Reminders</div>
+        <div class="muted">Notifications aren't supported in this browser.</div></div>`;
+    }
+    if (state.pushPermission !== "granted") {
+      return `<div class="card">
+        <div class="section-title dim">Reminders</div>
+        <div class="muted">Enable notifications to get reminders for weigh-ins, photos, and shots — even when the app is closed.</div>
+        <button class="btn btn-teal" id="enable-notifications-btn" style="margin-top:10px">Enable notifications</button>
+      </div>`;
+    }
+    const r = state.reminders;
+    return `<div class="card">
+      <div class="section-title dim">Reminders</div>
+      <div class="reminder-row">
+        <label><input type="checkbox" id="rem-weight-enabled" ${r.weight.enabled ? "checked" : ""}> Weight check-in</label>
+        <select id="rem-weight-time">${timeOptions(r.weight.time)}</select>
+      </div>
+      <div class="reminder-row">
+        <label><input type="checkbox" id="rem-photo-enabled" ${r.photo.enabled ? "checked" : ""}> Progress photo</label>
+        <select id="rem-photo-time">${timeOptions(r.photo.time)}</select>
+      </div>
+      <div class="reminder-row">
+        <label><input type="checkbox" id="rem-shot-enabled" ${r.shot.enabled ? "checked" : ""}> Injection day</label>
+        <div style="display:flex;gap:6px">
+          <select id="rem-shot-day">${dayOptions(r.shot.day)}</select>
+          <select id="rem-shot-time">${timeOptions(r.shot.time)}</select>
+        </div>
+      </div>
+      <button class="btn btn-teal" id="save-reminders-btn" style="margin-top:12px">${state.reminderSaveStatus === "saving" ? "Saving…" : "Save reminders"}</button>
+      <button class="link-btn" id="test-reminder-btn" style="margin-top:8px">Send test notification</button>
+      ${state.reminderSaveStatus === "ok" ? `<div class="muted" style="color:var(--teal)">Saved.</div>` : ""}
+      ${state.reminderSaveStatus === "error" ? `<div class="muted" style="color:var(--amber)">Couldn't save — check Tailscale connection.</div>` : ""}
+    </div>`;
   }
 
   function dismissOnboardCheck(){
@@ -411,6 +548,14 @@
   state.photoIndex = null;
   state.photoCache = {};
   state.photoUploading = false;
+  state.reminders = JSON.parse(localStorage.getItem("glp1-reminders") || "null") || {
+    weight: { enabled: false, time: "08:00" },
+    photo: { enabled: false, time: "08:00" },
+    shot: { enabled: false, day: "sun", time: "09:00" },
+  };
+  state.pushPermission = (typeof Notification !== "undefined") ? Notification.permission : "unsupported";
+  state.reminderSaveStatus = "idle";
+  let cachedSubscription = null;
 
   let deferredInstallPrompt = null;
   let installDismissed = false;
@@ -503,7 +648,8 @@
         <div class="section-title amber">${icon('syringe')} Injection doses</div>
         ${injChart}
       </div>
-      ${renderBackupCard()}`;
+      ${renderBackupCard()}
+      ${renderRemindersCard()}`;
   }
 
   function renderBackupCard(){
@@ -722,6 +868,12 @@
       if (backupBtn) backupBtn.addEventListener("click", syncToServer);
       const restoreBtn = document.getElementById("restore-backup");
       if (restoreBtn) restoreBtn.addEventListener("click", restoreFromServer);
+      const enableBtn = document.getElementById("enable-notifications-btn");
+      if (enableBtn) enableBtn.addEventListener("click", enablePushNotifications);
+      const saveRemindersBtn = document.getElementById("save-reminders-btn");
+      if (saveRemindersBtn) saveRemindersBtn.addEventListener("click", saveRemindersToServer);
+      const testReminderBtn = document.getElementById("test-reminder-btn");
+      if (testReminderBtn) testReminderBtn.addEventListener("click", sendTestReminder);
     }
 
     if (state.tab === "photos"){
@@ -876,6 +1028,7 @@
   console.log("[install] Page loaded. Waiting for beforeinstallprompt (may take a few seconds, or may never fire if Chrome doesn't consider this installable).");
 
   render();
+  initPush();
 })();
 </script>
 </body>
