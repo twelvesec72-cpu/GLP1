@@ -1,7 +1,7 @@
 {
   "id": "/index.html",
-  "name": "Weight & GLP-1 Tracker",
-  "short_name": "GLP-1 Log",
+  "name": "Weight Log",
+  "short_name": "Weight Log",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
