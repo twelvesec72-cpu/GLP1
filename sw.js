@@ -1,4 +1,4 @@
-const CACHE_NAME = "glp1-tracker-v3";
+const CACHE_NAME = "glp1-tracker-v4";
 const ASSETS = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (event) => {
@@ -18,8 +18,14 @@ self.addEventListener("activate", (event) => {
 // Network-first: always try the live page first so you never get stuck on a
 // stale copy while online. Only falls back to the cache if the network
 // request genuinely fails (actually offline).
+//
+// IMPORTANT: only intercept requests for this app's own files. Requests to
+// the dellcasa backend (backup, photos, reminders — a different origin) must
+// pass straight through untouched. Intercepting them here previously caused
+// restore-from-backup and other server calls to fail unpredictably.
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  if (!event.request.url.startsWith(self.location.origin)) return;
   event.respondWith(
     fetch(event.request)
       .then((response) => {
