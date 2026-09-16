@@ -159,7 +159,7 @@
   };
 
   // ---------- server backup (dellcasa, tailnet-only) ----------
-  const BACKUP_URL = "https://dellcasa-1.tail2b3657.ts.net:8096";
+  const BACKUP_URL = "https://dellcasa.tail2b3657.ts.net:8096";
   const BACKUP_API_KEY = "e7sBUgDU7zqXWZFfnyEfAY2hUMaDI9zq"; // tailnet-only endpoint; key is defense-in-depth, not the only protection
   const VAPID_PUBLIC_KEY = "BAAE2xbdgVR3BMJxaAW6An6BBbtiuznzx-Uxsl4qKxu2v140jVqdsT9Fgz2-32rNIvG6YFDJrSxgqIlH0CQryRg";
   let syncStatus = "idle"; // idle | syncing | ok | error
@@ -288,6 +288,53 @@
       const res = await fetch(BACKUP_URL + "/reminders/test", { method: "POST", headers: { "X-Api-Key": BACKUP_API_KEY } });
       alert(res.ok ? "Test sent — you should get a notification shortly." : "Test failed — save your reminders at least once first.");
     } catch (e) { alert("Couldn't reach the server. Check you're connected to Tailscale."); }
+  }
+
+  // ---------- Withings wireless scale ----------
+  async function checkWithingsStatus(){
+    try {
+      const res = await fetch(BACKUP_URL + "/withings/status", { headers: { "X-Api-Key": BACKUP_API_KEY } });
+      state.withingsStatus = res.ok ? await res.json() : null;
+    } catch (e) { state.withingsStatus = null; }
+    render();
+  }
+
+  async function checkWithingsImports(){
+    try {
+      const res = await fetch(BACKUP_URL + "/withings/imports", { headers: { "X-Api-Key": BACKUP_API_KEY } });
+      if (!res.ok) return;
+      const data = await res.json();
+      const dismissed = JSON.parse(localStorage.getItem("glp1-withings-dismissed") || "[]");
+      let changed = false;
+      for (const entry of (data.imports || [])) {
+        if (dismissed.includes(entry.id)) continue;
+        if (state.weightEntries.some(e => e.id === entry.id)) continue;
+        state.weightEntries.push({ id: entry.id, date: entry.date, time: entry.time, weight: entry.weight });
+        changed = true;
+      }
+      if (changed) {
+        state.weightEntries.sort((a, b) => (a.date + "T" + a.time).localeCompare(b.date + "T" + b.time));
+        saveList("glp1-weight-log", state.weightEntries);
+        render();
+      }
+    } catch (e) { console.error("withings import check failed", e); }
+  }
+
+  function renderWithingsCard(){
+    const s = state.withingsStatus;
+    if (!s) return `<div class="card"><div class="section-title dim">Wireless scale</div><div class="muted">Checking connection…</div></div>`;
+    if (!s.connected) {
+      return `<div class="card">
+        <div class="section-title dim">Wireless scale</div>
+        <div class="muted">Not connected yet. Readings within 15 lbs of your last weigh-in auto-import; anything further off (likely someone else in the house) is ignored.</div>
+        <a href="${BACKUP_URL}/withings/authorize" target="_blank" class="btn btn-teal" style="display:block;text-align:center;text-decoration:none;margin-top:10px;box-sizing:border-box">Connect Withings scale</a>
+      </div>`;
+    }
+    const lastLine = s.lastImport ? `, last: ${s.lastImport.weight} lbs on ${fmtDateShort(s.lastImport.date)}` : "";
+    return `<div class="card">
+      <div class="section-title dim">Wireless scale</div>
+      <div class="muted" style="color:var(--teal)">Connected — ${s.importedCount} auto-imported so far${lastLine}</div>
+    </div>`;
   }
 
   function timeOptions(selected){
@@ -561,6 +608,7 @@
   };
   state.pushPermission = (typeof Notification !== "undefined") ? Notification.permission : "unsupported";
   state.reminderSaveStatus = "idle";
+  state.withingsStatus = null;
   let cachedSubscription = null;
 
   let deferredInstallPrompt = null;
@@ -655,7 +703,8 @@
         ${injChart}
       </div>
       ${renderBackupCard()}
-      ${renderRemindersCard()}`;
+      ${renderRemindersCard()}
+      ${renderWithingsCard()}`;
   }
 
   function renderBackupCard(){
@@ -866,6 +915,7 @@
         state.tab = btn.dataset.tab;
         render();
         if (state.tab === "photos") loadPhotosTab();
+        if (state.tab === "home") { checkWithingsStatus(); checkWithingsImports(); }
       });
     });
 
@@ -952,6 +1002,13 @@
       document.querySelectorAll("[data-w-del]").forEach(btn => {
         btn.addEventListener("click", () => {
           const id = btn.dataset.wDel;
+          if (id.startsWith("withings-")) {
+            const dismissed = JSON.parse(localStorage.getItem("glp1-withings-dismissed") || "[]");
+            if (!dismissed.includes(id)) {
+              dismissed.push(id);
+              localStorage.setItem("glp1-withings-dismissed", JSON.stringify(dismissed));
+            }
+          }
           state.weightEntries = state.weightEntries.filter(e => e.id !== id);
           saveList("glp1-weight-log", state.weightEntries);
           if (state.editingWeightId === id){
@@ -1035,6 +1092,8 @@
 
   render();
   initPush();
+  checkWithingsStatus();
+  checkWithingsImports();
 })();
 </script>
 </body>
