@@ -290,77 +290,6 @@
     } catch (e) { alert("Couldn't reach the server. Check you're connected to Tailscale."); }
   }
 
-  // ---------- Withings wireless scale ----------
-  // On-demand only, by design: the app must be open and you must tap
-  // "Check for new weigh-in" — nothing ever gets added automatically.
-  // Whatever comes back is shown to you to accept or ignore, since this
-  // scale is shared and only you can really tell if a reading is yours.
-  async function checkWithingsStatus(){
-    try {
-      const res = await fetch(BACKUP_URL + "/withings/status", { headers: { "X-Api-Key": BACKUP_API_KEY } });
-      state.withingsStatus = res.ok ? await res.json() : null;
-    } catch (e) { state.withingsStatus = null; }
-    render();
-  }
-
-  async function checkForWeighIn(){
-    state.withingsChecking = true; render();
-    try {
-      const res = await fetch(BACKUP_URL + "/withings/check", { headers: { "X-Api-Key": BACKUP_API_KEY } });
-      if (!res.ok) { alert("Couldn't check for a new weigh-in. Make sure you're connected to Tailscale."); }
-      else {
-        const data = await res.json();
-        const readings = data.readings || [];
-        // Only offer ones not already sitting in the pending list or the log
-        const known = new Set([...state.weightEntries.map(e => e.id), ...state.withingsPending.map(e => e.id)]);
-        const fresh = readings.filter(r => !known.has(r.id));
-        state.withingsPending = state.withingsPending.concat(fresh);
-        if (readings.length === 0) alert("No new weigh-ins on the scale since last check.");
-      }
-    } catch (e) { alert("Couldn't reach the server. Check you're connected to Tailscale."); }
-    state.withingsChecking = false; render();
-  }
-
-  function acceptWithingsReading(id){
-    const reading = state.withingsPending.find(r => r.id === id);
-    if (!reading) return;
-    state.withingsPending = state.withingsPending.filter(r => r.id !== id);
-    state.weightEntries.push({ id: reading.id, date: reading.date, time: reading.time, weight: reading.weight });
-    state.weightEntries.sort((a, b) => (a.date + "T" + a.time).localeCompare(b.date + "T" + b.time));
-    saveList("glp1-weight-log", state.weightEntries);
-    render();
-  }
-
-  function ignoreWithingsReading(id){
-    state.withingsPending = state.withingsPending.filter(r => r.id !== id);
-    render();
-  }
-
-  function renderWithingsCard(){
-    const s = state.withingsStatus;
-    if (!s) return `<div class="card"><div class="section-title dim">Wireless scale</div><div class="muted">Checking connection…</div></div>`;
-    if (!s.connected) {
-      return `<div class="card">
-        <div class="section-title dim">Wireless scale</div>
-        <div class="muted">Not connected yet. Once connected, tap "Check for new weigh-in" while the app is open to pull the latest reading — nothing is ever added without you confirming it.</div>
-        <a href="${BACKUP_URL}/withings/authorize" target="_blank" class="btn btn-teal" style="display:block;text-align:center;text-decoration:none;margin-top:10px;box-sizing:border-box">Connect Withings scale</a>
-      </div>`;
-    }
-    const pendingHtml = state.withingsPending.map(r => `
-      <div class="reminder-row" style="border-top:1px solid var(--border);padding-top:10px">
-        <div>${r.weight} lbs<div class="muted" style="padding:0;font-size:12px">${esc(fmtDateShort(r.date))} ${esc(r.time)}</div></div>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-teal" style="width:auto;padding:8px 14px" data-withings-accept="${r.id}">Add</button>
-          <button class="link-btn" data-withings-ignore="${r.id}">Ignore</button>
-        </div>
-      </div>`).join("");
-    return `<div class="card">
-      <div class="section-title dim">Wireless scale</div>
-      <div class="muted" style="color:var(--teal)">Connected</div>
-      <button class="btn btn-teal" id="withings-check-btn" style="margin-top:10px" ${state.withingsChecking ? "disabled" : ""}>${state.withingsChecking ? "Checking…" : "Check for new weigh-in"}</button>
-      ${pendingHtml}
-    </div>`;
-  }
 
   function timeOptions(selected){
     const opts = [];
@@ -633,9 +562,6 @@
   };
   state.pushPermission = (typeof Notification !== "undefined") ? Notification.permission : "unsupported";
   state.reminderSaveStatus = "idle";
-  state.withingsStatus = null;
-  state.withingsPending = [];
-  state.withingsChecking = false;
   let cachedSubscription = null;
 
   let deferredInstallPrompt = null;
@@ -734,8 +660,7 @@
         ${injChart}
       </div>
       ${renderBackupCard()}
-      ${renderRemindersCard()}
-      ${renderWithingsCard()}`;
+      ${renderRemindersCard()}`;
   }
 
   function renderBackupCard(){
@@ -946,7 +871,6 @@
         state.tab = btn.dataset.tab;
         render();
         if (state.tab === "photos") loadPhotosTab();
-        if (state.tab === "home") checkWithingsStatus();
       });
     });
 
@@ -961,14 +885,6 @@
       if (saveRemindersBtn) saveRemindersBtn.addEventListener("click", saveRemindersToServer);
       const testReminderBtn = document.getElementById("test-reminder-btn");
       if (testReminderBtn) testReminderBtn.addEventListener("click", sendTestReminder);
-      const withingsCheckBtn = document.getElementById("withings-check-btn");
-      if (withingsCheckBtn) withingsCheckBtn.addEventListener("click", checkForWeighIn);
-      document.querySelectorAll("[data-withings-accept]").forEach(btn => {
-        btn.addEventListener("click", () => acceptWithingsReading(btn.dataset.withingsAccept));
-      });
-      document.querySelectorAll("[data-withings-ignore]").forEach(btn => {
-        btn.addEventListener("click", () => ignoreWithingsReading(btn.dataset.withingsIgnore));
-      });
     }
 
     if (state.tab === "photos"){
@@ -1124,7 +1040,6 @@
 
   render();
   initPush();
-  checkWithingsStatus();
 })();
 </script>
 </body>
